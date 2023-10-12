@@ -2,7 +2,7 @@ classdef Gripper_Controller < handle
     %GRIPPER_CONTROLLER Used for opening/closing the gripper
 
     properties (Access = private)
-        q =zeros(1,3);     % both fingers will have same joint angles
+        q =zeros(1,4);     % both fingers will have same joint angles
         STEPS = 10;                 % number of steps to move in the animation
 
         Q_OPEN; % open position joint angles
@@ -14,8 +14,9 @@ classdef Gripper_Controller < handle
 
     properties (Access = public)
         gripperStatus = 0;          % open = 0, closed = 1
-        rightGripper; % selfect for the right gripper
-        leftGripper; % selfect for the left gripper        
+        A; % object for the thumb gripper
+        B; % object for the index gripper
+        C; % object for the pinky gripper        
         
     end
 
@@ -27,8 +28,9 @@ classdef Gripper_Controller < handle
             
             Gripper;
 
-            self.rightGripper=gripperRight;
-            self.leftGripper=gripperLeft;
+            self.A = A;
+            self.B = B;
+            self.C = C;
 
             self.Q_OPEN=qOpen;
             self.Q_CLOSED=qClosed;
@@ -36,11 +38,13 @@ classdef Gripper_Controller < handle
             
             %plot the gripper
             hold on
-            self.rightGripper.plot(qOpen);
-            self.leftGripper.plot(qOpen);
-
+            self.A.plot(qOpen,'nowrist','nobase');
+            self.B.plot(qOpen,'nowrist','nobase');
+            self.C.plot(qOpen,'nowrist','nobase');
+            axis equal
+            
             %update joint angles
-            self.q = self.rightGripper.getpos;
+            self.q = self.A.getpos;
         end
 
         %% Open gripper
@@ -55,16 +59,18 @@ classdef Gripper_Controller < handle
 
 
             hold on
-            self.rightGripper.plot(self.rightGripper.getpos);
-            self.leftGripper.plot(self.leftGripper.getpos);
+            self.A.plot(self.A.getpos);
+            self.B.plot(self.B.getpos);
+            self.C.plot(self.C.getpos);
 
-            self.q=self.rightGripper.getpos;
+            self.q=self.A.getpos;
 
             qMatrix=jtraj(self.q,self.Q_OPEN,self.STEPS);
 
             % animate the step
-            self.leftGripper.animate(qMatrix(self.status,:));
-            self.rightGripper.animate(qMatrix(self.status,:));
+            self.A.animate(qMatrix(self.status,:));
+            self.B.animate(qMatrix(self.status,:));
+            self.C.animate(qMatrix(self.status,:));
 
             % handle the case where the movement is finished
             if self.status == self.STEPS
