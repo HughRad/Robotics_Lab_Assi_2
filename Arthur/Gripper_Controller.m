@@ -42,7 +42,7 @@ classdef Gripper_Controller < handle
             self.B.plot(qOpen,'nowrist','nobase');
             self.C.plot(qOpen,'nowrist','nobase');
             axis equal
-            
+
             %update joint angles
             self.q = self.A.getpos;
         end
@@ -101,16 +101,18 @@ classdef Gripper_Controller < handle
             end
 
             hold on
-            self.rightGripper.plot(self.rightGripper.getpos);
-            self.leftGripper.plot(self.leftGripper.getpos);
+            self.A.plot(self.A.getpos);
+            self.B.plot(self.B.getpos);
+            self.C.plot(self.C.getpos);
 
-            self.q=self.rightGripper.getpos;
+            self.q=self.A.getpos;
 
             qMatrix=jtraj(self.q,self.Q_CLOSED,self.STEPS);
 
             % animate the step
-            self.leftGripper.animate(qMatrix(self.status,:));
-            self.rightGripper.animate(qMatrix(self.status,:));
+            self.B.animate(qMatrix(self.status,:));
+            self.A.animate(qMatrix(self.status,:));
+            self.C.animate(qMatrix(self.status,:));
 
             % handle the case where the movement is finished
             if self.status == self.STEPS
@@ -140,7 +142,7 @@ classdef Gripper_Controller < handle
         function [q]=updateJointAngles(self)
             
             try 
-                self.q=self.rightGripper.getpos;
+                self.q=self.A.getpos;
                 q=self.q;
             catch 
                 disp('unable to find joint angles - plot is likely closed');
@@ -150,10 +152,13 @@ classdef Gripper_Controller < handle
         %% Update base location
         function updateBaseLocation(self,T)
 
-            self.rightGripper.base=T*transl(0.01,0,0)*trotz(deg2rad(180));
-            self.leftGripper.base=T*transl(-0.01,0,0);
-            self.rightGripper.animate(self.updateJointAngles);
-            self.leftGripper.animate(self.updateJointAngles);
+            self.A.base = transl(0.0,  -0.04,   0) * trotz(deg2rad(90));
+            self.B.base = transl(0.055,  0.04, 0) * trotz(deg2rad(-90));
+            self.C.base = transl(-0.055, 0.04, 0) * trotz(deg2rad(-90));
+
+            self.A.animate(self.updateJointAngles);
+            self.B.animate(self.updateJointAngles);
+            self.C.animate(self.updateJointAngles);
 
         end
 
