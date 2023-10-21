@@ -9,7 +9,7 @@ classdef BarDemo
             clc
             clf
 
-            C = DobotCR5(transl([-0.25,0.66,0.68])); %Load bots (with offset)
+            C = DobotCR5(transl([-0.60,0.70,0.68])); %Load bots (with offset)
             hold on;
             U = UR3(transl([0.30,0.66,0.68])); 
 
@@ -35,12 +35,15 @@ classdef BarDemo
                        ,(PlaceObject('Glass.ply',Glasspos{1,4}))];
 
             CupSpot = {[-0.02,0.26,0.7],[0.13,0.26,0.7],[0.28,0.26,0.7]...
-                        ,[0.43,0.26,0.7],[0.73,0.20,0.7]};
-            temply = [(PlaceObject('Glass.ply',CupSpot{1,1}))...  %placing cups at starting location
-                       ,(PlaceObject('Glass.ply',CupSpot{1,2}))...  
-                       ,(PlaceObject('Glass.ply',CupSpot{1,3}))...
-                       ,(PlaceObject('Glass.ply',CupSpot{1,4}))...  
-                       ,(PlaceObject('Glass.ply',CupSpot{1,5}))];
+                        ,[0.43,0.26,0.7],[0.73,0.20,0.7],[-0.68,0.20,0.7]...
+                        ,[-0.605,1.205,0.7]};
+            % temply = [(PlaceObject('Glass.ply',CupSpot{1,1}))...  %placing cups at starting location
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,2}))...  
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,3}))...
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,4}))...  
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,5}))...
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,6}))...  
+            %            ,(PlaceObject('Glass.ply',CupSpot{1,7}))];
 
             [f1,v1,data1] = plyread('Robotiq_3finger.ply','tri'); %gets gripper vertex info at 0,0,0
             COgrip = PlaceObject('Robotiq_3finger.ply',[0,0,0]); %load gripper model
@@ -58,6 +61,7 @@ classdef BarDemo
             % axis([-2,2,-2,2,0,2]); %full View
             view(3);
 
+            % CO.teach();
             % UR.teach([0,-pi/2,0,-pi/2,0,0]);
 
             glass = 1; %target glass
@@ -71,8 +75,17 @@ classdef BarDemo
                         disp("you selected 1");
                         GPick = Glasspos{glass} + [0,-0.1,0.05]; %mod to grab glass right
                         GPlace = CupSpot{1} + [0,0.1,0.05];
+                        GP = GlassPLY(glass); %Glass PLY to move
 
-                        self.BeerServer(UR,GPick,GPlace,URgrip)
+                        self.BeerServer(UR,GPick,GPlace,URgrip,GP)
+
+                        Pickpos = self.GlassReturn(GP);
+                        GPick2 = CupSpot{7} + [0,-0.1,0.05];
+                        GPlace2 = Pickpos + [0,0.1,0.05];
+
+                        self.BeerRecaller(CO,UR,GPick2,GPlace2,COgrip,URgrip,GP)
+
+                        self.BeerReturner(CO,UR,GPick,GPlace,COgrip,URgrip,GP)
 
                         glass = glass + 1; %cycle through glasses
                         if glass == 5
@@ -83,8 +96,17 @@ classdef BarDemo
                         disp("you selected 2");
                         GPick = Glasspos{glass} + [0,-0.1,0.05]; 
                         GPlace = CupSpot{2} + [0,0.1,0.05];
+                        GP = GlassPLY(glass);
 
-                        self.BeerServer(UR,GPick,GPlace,URgrip)
+                        self.BeerServer(UR,GPick,GPlace,URgrip,GP)
+
+                        Pickpos = self.GlassReturn(GP);
+                        GPick2 = CupSpot{7} + [0,-0.1,0.05];
+                        GPlace2 = Pickpos + [0,0.1,0.05];
+
+                        self.BeerRecaller(CO,UR,GPick2,GPlace2,COgrip,URgrip,GP)
+
+                        self.BeerReturner(CO,UR,GPick,GPlace,COgrip,URgrip,GP)
 
                         glass = glass + 1; 
                         if glass == 5
@@ -95,8 +117,17 @@ classdef BarDemo
                         disp("you selected 3");
                         GPick = Glasspos{glass} + [0,-0.1,0.05]; 
                         GPlace = CupSpot{3} + [0,0.1,0.05];
+                        GP = GlassPLY(glass);
 
-                        self.BeerServer(UR,GPick,GPlace,URgrip)
+                        self.BeerServer(UR,GPick,GPlace,URgrip,GP)
+
+                        Pickpos = self.GlassReturn(GP);
+                        GPick2 = CupSpot{7} + [0,-0.1,0.05];
+                        GPlace2 = Pickpos + [0,0.1,0.05];
+
+                        self.BeerRecaller(CO,UR,GPick2,GPlace2,COgrip,URgrip,GP)
+
+                        self.BeerReturner(CO,UR,GPick,GPlace,COgrip,URgrip,GP)
 
                         glass = glass + 1; 
                         if glass == 5
@@ -107,8 +138,17 @@ classdef BarDemo
                         disp("you selected 4");
                         GPick = Glasspos{glass} + [0,-0.1,0.05]; 
                         GPlace = CupSpot{4} + [0,0.1,0.05];
+                        GP = GlassPLY(glass);
 
-                        self.BeerServer(UR,GPick,GPlace,URgrip)
+                        self.BeerServer(UR,GPick,GPlace,URgrip,GP)
+
+                        Pickpos = self.GlassReturn(GP);
+                        GPick2 = CupSpot{7} + [0,-0.1,0.05];
+                        GPlace2 = Pickpos + [0,0.1,0.05];
+
+                        self.BeerRecaller(CO,UR,GPick2,GPlace2,COgrip,URgrip,GP)
+
+                        self.BeerReturner(CO,UR,GPick,GPlace,COgrip,URgrip,GP)
 
                         glass = glass + 1; 
                         if glass == 5
@@ -197,8 +237,9 @@ classdef BarDemo
             end
         end
         
-        function Ranimate(robot,qMatrix,grip) %robot animation function
+        function Ranimate(robot,qMatrix,grip,GP,robot2,grip2,qMatrix2) %robot animation function
             [f1,v1,data1] = plyread('Robotiq_3finger.ply','tri'); %gets gripper vertex info at 0,0,0
+            [f,v,data] = plyread('Glass.ply','tri'); %gets vector position data for glass ply at origin
 
             for i = 1:1:size(qMatrix)
                 robot.animate(qMatrix(i,:)); 
@@ -207,60 +248,193 @@ classdef BarDemo
                 transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
                 set(grip,'Vertices',transVertfin(:,1:3)); 
 
+                if exist('GP', 'var') == 1
+                    grabvert = robot.fkine(qMatrix(i,:)).T*troty(-pi/2)*transl(0.1,0,-0.05); %gets current UR3 end effector position
+                    transVert = [v,ones(size(v,1),1)]*grabvert'; %gets new values for the brick vertice positions
+                    set(GP,'Vertices',transVert(:,1:3)); %sets current brick vertices to new pos
+                end
+
+                if exist('robot2', 'var') == 1
+                    robot2.animate(qMatrix2(i,:));
+
+                    gripvertfin = robot2.fkine(qMatrix2(i,:)).T*trotz(pi/2)*transl(0,0,-0.003); 
+                    transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
+                    set(grip2,'Vertices',transVertfin(:,1:3));
+                end
+
                 pause(0.01);
             end
         end
 
-        function BeerServer(UR,GPick,GPlace,URgrip) %UR bot cup filler/placer
+        function BeerServer(robot,GPick,GPlace,grip,GP) %UR bot cup filler/placer
+
             %to start
             q0 = [-1.6336,-1.1938,1.5080,-0.3142,1.5080,0];
             tr = transl(GPick+[0,0,0.2])*troty(pi/2)*trotx(-pi/2);
-            newQ = UR.ikcon(tr,q0);
-            qMatrix = jtraj(UR.getpos,newQ,50);
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            newQ = robot.ikcon(tr,q0);
+            qMatrix = jtraj(robot.getpos,newQ,50);
+            BarDemo.Ranimate(robot,qMatrix,grip);
 
             %to cup
-            current = tform2trvec(UR.fkine(UR.getpos).T);
+            current = tform2trvec(robot.fkine(robot.getpos).T);
             angles = [-pi/2,pi/2,0; -pi/2,pi/2,0;]';
             waypoints = [current; GPick;]';
-            qMatrix = BarDemo.RMCgen(UR,waypoints,angles);        
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip);
 
             pause(3);
             
             %to tap
-            current = tform2trvec(UR.fkine(UR.getpos).T);
+            current = tform2trvec(robot.fkine(robot.getpos).T);
             angles = [-pi/2,pi/2,0; -pi/2,pi/2,0; -pi/2,pi/2,0;
                       -pi,pi/2,0; (-270*pi/180),pi/2,0;]';
             waypoints = [current; (GPick+[0,0,0.2]);0,0.9,0.9;
                         -0.05,0.5,0.8; GPlace;]';
-            qMatrix = BarDemo.RMCgen(UR,waypoints,angles);        
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip,GP);
 
             pause(3);
 
             %to end
-            current = tform2trvec(UR.fkine(UR.getpos).T);
+            current = tform2trvec(robot.fkine(robot.getpos).T);
             angles = [(-270*pi/180),pi/2,0; (-270*pi/180),pi/2,0;
                       (-310*pi/180),pi/2,0;]';
-            waypoints = [current; 0.50,0.40,0.8;
+            waypoints = [current; 0.60,0.40,0.8;
                         0.66,0.30,0.75]';
-            qMatrix = BarDemo.RMCgen(UR,waypoints,angles);        
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip,GP);
 
             pause(3);
 
             %retract
-            current = tform2trvec(UR.fkine(UR.getpos).T);
-            angles = [(-310*pi/180),pi/2,0; (-310*pi/180),pi/2,0;]';
-            waypoints = [current; 0.50,0.40,0.8;
-                        0.7,0.6,1]';
-            qMatrix = BarDemo.RMCgen(UR,waypoints,angles);        
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            current = tform2trvec(robot.fkine(robot.getpos).T);
+            angles = [(-310*pi/180),pi/2,0; (-310*pi/180),pi/2,0;
+                      (-2*pi),pi/2,0]';
+            waypoints = [current; 0.60,0.40,0.8;
+                        0.75,0.66,1]';
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip);
 
             q0 = [0,-pi/2,0,-pi/2,0,0];
-            qMatrix = jtraj(UR.getpos,q0,50);
-            BarDemo.Ranimate(UR,qMatrix,URgrip);
+            qMatrix = jtraj(robot.getpos,q0,50);
+            BarDemo.Ranimate(robot,qMatrix,grip);
+        end
+        
+        function BeerRecaller(robot,robot2,GPick,GPlace,grip,grip2,GP)
+            %to start
+            q0 = [-1.3823,-0.1257,-1.8396,-1.1310,-1.3823,0];
+            tr = transl(GPlace+[0,0,0.2])*troty(pi/2)*trotx(pi/2);
+            newQ = robot.ikcon(tr,q0);
+            qMatrix = jtraj(robot.getpos,newQ,50);
+            BarDemo.Ranimate(robot,qMatrix,grip);
+
+            %to dirty cup
+            current = tform2trvec(robot.fkine(robot.getpos).T);
+            angles = [pi/2,pi/2,0; pi/2,pi/2,0;]';
+            waypoints = [current; GPlace;]';
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip);
+
+            pause(3);
+
+            %to washer
+            current = tform2trvec(robot.fkine(robot.getpos).T);
+            angles = [pi/2,pi/2,0; pi/2,-pi/2,0; pi,-pi/2,0;
+                      3*pi/2,-pi/2,0; 3*pi/2,-pi/2,0;
+                      3*pi/2,-pi/2,0;3*pi/2,-pi/2,0;]';
+            waypoints = [current; (GPlace+[0,0,0.2]);-0.2,0.65,0.9;
+                        GPick+[0,0,0.2]; (GPick+[0,0,0.08]);
+                        (GPick+[0,0,0.08]);GPick+[0,0,0.2];]';
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);        
+            BarDemo.Ranimate(robot,qMatrix,grip,GP);
+
+            pause(3);
+
+            %handover pt 1 (prepare)
+            rendezvous = [-0.15,0.66,0.9];
+
+            q0 = [-0.1257,-0.2513,-1.4067,-1.5080,-1.7593,1.5080];
+            tr = transl(rendezvous+[-0.2,0,0])*troty(-pi/2)*trotx(pi);
+            newQ = robot.ikcon(tr,q0);
+            qMatrix = jtraj(robot.getpos,newQ,50);
+
+            q0 = [0,-1.3195,1.8850,-0.5655,1.5708,1.5708];
+            tr = transl(rendezvous+[0.2,0,0])*troty(-pi/2);
+            newQ = robot2.ikcon(tr,q0);
+            qMatrix2 = jtraj(robot2.getpos,newQ,50);
+
+            BarDemo.Ranimate(robot,qMatrix,grip,GP,robot2,grip2,qMatrix2);
+
+            %handover pt 2 (join)
+            current = tform2trvec(robot.fkine(robot.getpos).T);
+            angles = [pi,-pi/2,0; pi,-pi/2,0;]';
+            waypoints = [current; (rendezvous+[-0.1,0,0.05]);]';
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);  
+
+            current = tform2trvec(robot2.fkine(robot2.getpos).T);
+            angles = [0,-pi/2,0; 0,-pi/2,0;]';
+            waypoints = [current; (rendezvous+[0.1,0,0.05]);]';
+            qMatrix2 = BarDemo.RMCgen(robot2,waypoints,angles);
+
+            BarDemo.Ranimate(robot,qMatrix,grip,GP,robot2,grip2,qMatrix2);
+
+            pause(3);
+
+            %handover pt 3 (retract)
+            current = tform2trvec(robot.fkine(robot.getpos).T);
+            angles = [pi,-pi/2,0; pi,-pi/2,0;]';
+            waypoints = [current; (rendezvous+[-0.2,0,0.05]);]';
+            qMatrix = BarDemo.RMCgen(robot,waypoints,angles);  
+
+            current = tform2trvec(robot2.fkine(robot2.getpos).T);
+            angles = [0,-pi/2,0; 0,-pi/2,0;]';
+            waypoints = [current; (rendezvous+[0.2,0,0.05]);]';
+            qMatrix2 = BarDemo.RMCgen(robot2,waypoints,angles);
+
+            BarDemo.Ranimate(robot2,qMatrix2,grip2,GP,robot,grip,qMatrix);
+
+            pause(3);
+
+        end
+
+        function BeerReturner(robot,robot2,GPick,GPlace,grip,grip2,GP)
+            %return cup
+            current = tform2trvec(robot2.fkine(robot2.getpos).T);
+            angles = [0,-pi/2,0; 0,-pi/2,0; -pi/2,pi/2,0;-pi/2,pi/2,0;]';
+            waypoints = [current; current;(GPick+[0,0,0.2]);GPick;]';
+            qMatrix2 = BarDemo.RMCgen(robot2,waypoints,angles);
+
+            BarDemo.Ranimate(robot2,qMatrix2,grip2,GP);
+
+            pause(3);
+            
+            %cup retract
+            current = tform2trvec(robot2.fkine(robot2.getpos).T);
+            angles = [-pi/2,pi/2,0; -pi/2,pi/2,0; -pi/2,pi/2,0;]';
+            waypoints = [current; (GPick+[0,0,0.2]);0.3,0.9,0.9;]';
+            qMatrix2 = BarDemo.RMCgen(robot2,waypoints,angles);        
+            BarDemo.Ranimate(robot2,qMatrix2,grip2);
+
+            %return to start
+            q0 = [0,0,0,0,0,0];
+            qMatrix = jtraj(robot.getpos,q0,50);
+
+            q0 = [0,-pi/2,0,-pi/2,0,0];
+            qMatrix2 = jtraj(robot2.getpos,q0,50);
+
+            BarDemo.Ranimate(robot,qMatrix,grip,[],robot2,grip2,qMatrix2)
+
+        end
+
+        function Pickpos = GlassReturn(GP)
+            [f,v,data] = plyread('Glass.ply','tri'); 
+
+            randomx = -0.5 + (-0.87 + 0.5)*rand;
+            randomy = 0.15 + (0.30 - 0.15)*rand;
+            Pickpos = [randomx,randomy,0.7];
+
+            transVert = v+Pickpos; 
+            set(GP,'Vertices',transVert(:,1:3)); 
         end
 
     end
