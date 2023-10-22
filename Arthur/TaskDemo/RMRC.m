@@ -1,0 +1,142 @@
+classdef RMRC
+    % Calculates Resolved motion rate control and returns 
+
+    properties (Access = private)
+        
+        robot; %!< SerialLink robot object used in trajectory generation
+        positions; %!< [x,y,z] Coordinates of waypoints for the robot to go to
+        orientations; %!< 
+
+        t; %!< Desired time taken for the robot to complete its trajectory
+        deltaT; %!< Desired time step
+        steps; %!< Number of steps to be taken during the trajectory
+        epsilon; %!< Threshold for DLS manipulability attenuation
+        W; %!< weighting matrix for orientation and position
+
+        % array data
+        m; %!< Manipulability
+        qdot; %!< Joint velocities
+        theta; %!< Orientations along trajectory
+        x; %!< Positions along trajectory
+
+
+        qMatrix; %!< [steps x n] Matrix of joint positions where steps is the number of steps in the trajectory and n is the joint angles of the robot
+
+    end
+
+    methods
+        %% Constructor
+        function self = RMRC(robot,waypoints,angles)
+            
+            % Assign properties
+            self.robot = robot;
+            self.positions = waypoints;
+            self.orientations = angles;
+
+            %%start/settings
+            self.t = 3;             % Total sim time (s)
+            self.deltaT = 0.02;      % Control frequency (time between steps)
+            self.steps = self.t/self.deltaT;   % No. of steps for simulation
+            self.epsilon = 0.1;      % Threshold value for manipulability/Damped Least Squares (how close to sing before it modifyies path)
+            self.W = diag([1 1 1 1 1 1]);    % Weighting matrix for the velocity vector (emphasis on tans or rot velocity)
+
+            %Pre-Allocate array data
+            self.m = zeros(self.steps,1);             % Array for Measure of Manipulability
+            self.qMatrix = zeros(self.steps,6);       % Array for joint anglesR
+            self.qdot = zeros(steps,6);          % Array for joint velocities
+            self.theta = zeros(3,steps);         % Array for roll-pitch-yaw angles
+            self.x = zeros(3,steps);             % Array for x-y-z trajectory
+
+        end
+        
+        %% Create qMatrix
+        function qMatrix = calculateQMatrix(self)
+
+            % Set up trajectory,
+            s = trapveltraj(waypoints,self.steps);     % Trapezoidal trajectory scalar
+            a = trapveltraj(angles,self.steps);
+            for i=1:self.steps
+                self.x(1,i) = s(1,i); % Points in x
+                self.x(2,i) = s(2,i); % Points in y
+                self.x(3,i) = s(3,i); % Points in z
+                self.theta(1,i) = a(1,i);    % Roll angle
+                self.theta(2,i) = a(2,i);    % Pitch angle
+                self.theta(3,i) = a(3,i);    % Yaw angle
+            end
+
+            % hold on
+            % plot3(x(1,:),x(2,:),x(3,:),'k.','LineWidth',1)
+
+            %first position of robot
+            T = [rpy2r(self.theta(1,1),self.theta(2,1),self.theta(3,1)) self.x(:,1);zeros(1,3) 1];  % Create transformation of first point and angle
+            q0 = [self.robot.getpos];          % Initial guess for joint angles
+            self.qMatrix(1,:) = self.robot.ikcon(T,q0);
+
+            % Track the trajectory with RMRC
+            for i = 1:self.steps-1
+                T = self.robot.fkine(self.qMatrix(i,:)).T; % Get forward transformation at current joint state(to ensure accuracy)
+                deltaX = self.x(:,i+1) - T(1:3,4);  % Get position error from next waypoint (diff between next location and current xzy position)
+                Rd = rpy2r(self.theta(1,i+1),self.theta(2,i+1),self.theta(3,i+1)); % Get next RPY angles, convert to rotation matrix
+                Ra = T(1:3,1:3);      % Current end-effector rotation matrix
+                Rdot = (1/self.deltaT)*(Rd - Ra);        % Calculate rotation matrix error (diff between nex angle and current)
+
+                S = Rdot*Ra';         % Skew symmetric matrix contains the angular velocities
+                linear_velocity = (1/self.deltaT)*deltaX; %velocit to next point
+                angular_velocity = [S(3,2);S(1,3);S(2,1)]; %Velocity to next angle, extracted from Skew Symmetric matrix
+                xdot = self.W*[linear_velocity;angular_velocity];   % Calculate end-effector velocity to reach next waypoint. * by our weights
+
+                J = self.robot.jacob0(self.qMatrix(i,:));     % Get Jacobian at current joint state
+                self.m(i) = sqrt(det(J*J')); %get end effector manipuability
+
+                if self.m(i) < self.epsilon  % If manipulability is less than given threshold
+                    lambda = (1 - self.m(i)/self.epsilon)*5E-2; %(*a value for lambda max)
+                else %does DLS if the arm aproches singularity
+                    lambda = 0;
+                end
+                invJ = inv(J'*J + lambda *eye(6))*J'; % Damped Least Squared Inverse
+
+                self.qdot(i,:) = (invJ*xdot)';  % Solve the RMRC equation (you may need to transpose the vector)
+                for j = 1:6           % Loop through joints 1 to 6
+                    if self.qMatrix(i,j) + self.deltaT*self.qdot(i,j) < self.robot.qlim(j,1)  % If next joint angle is lower than joint limit...(if velocities will cause joint angles to go below the limit)
+                        self.qdot(i,j) = 0; % Stop the motor
+                    elseif self.qMatrix(i,j) + self.deltaT*self.qdot(i,j) > self.robot.qlim(j,2)  % If next joint angle is greater than joint limit ... (if velocities will cause joint angles to go above the limit)
+                        self.qdot(i,j) = 0; % Stop the motor
+                    end
+                end
+
+                self.qMatrix(i+1,:) = self.qMatrix(i,:) + self.deltaT*self.qdot(i,:);     % Update next joint state based on joint velocities
+            end
+
+            qMatrix = self.qMatrix;
+
+        end
+
+        %% Setters
+        function setTime(self,time)
+            self.t = time;
+        end
+
+        function setTimeStep(self,timeStep)
+            self.deltaT = timeStep;
+        end
+
+        function setSteps(self,steps)
+            self.steps = steps;
+        end
+
+        function setDLSThreshold(self,threshold)
+            self.epsilon = threshold;
+        end
+
+        function setWeight(self,weight)
+            self.W = weight;
+        end
+        
+        %% Getters
+
+        function qMatrix = getQMatrix(self)
+            qMatrix = self.qMatrix;
+        end
+
+    end
+end
