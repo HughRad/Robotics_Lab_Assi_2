@@ -20,8 +20,8 @@ classdef Place2F85
             place.fingers = {R2F85(), R2F85()};
 
             place.openClawPos = [0, 0];     % Define open position
-            place.tapClawPos = [deg2rad(20), 0]; % Define tap pos 
-            place.glassClawPos = [deg2rad(20),deg2rad(15)]; %Define glass pos
+            place.tapClawPos = [deg2rad(36.3), deg2rad(-25.5)]; % Define tap pos 
+            place.glassClawPos = [deg2rad(14.4),deg2rad(6.2)]; %Define glass pos
             place.fingerJointPos = place.fingers{1}.model.getpos;
 
             for i = 1:numel(place.fingers)
