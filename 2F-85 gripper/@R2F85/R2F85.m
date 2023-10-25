@@ -28,7 +28,7 @@ classdef R2F85 < RobotBaseClass
         function CreateModel(self)
 
             link(1)=Link('d',0,'a',0.05715,'alpha',0,'offset',deg2rad(-40),'qlim',deg2rad([0 40]));
-            link(2)=Link('d',0,'a',0.04450,'alpha',0,'offset',deg2rad(40),'qlim',deg2rad([0 20]));
+            link(2)=Link('d',0,'a',0.04450,'alpha',0,'offset',deg2rad(40),'qlim',deg2rad([-40 20]));
          
             self.model = SerialLink(link,'name',self.name);
     
