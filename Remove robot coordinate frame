@@ -1,0 +1,6 @@
+edit line 203 in RobotBaseClass 
+from:
+self.model.plot3d(self.homeQ,'noarrow','workspace',self.workspace,'view',[ax,by]);%,'notiles');    
+
+to:
+self.model.plot3d(self.homeQ,'nowrist','noarrow','workspace',self.workspace,'view',[ax,by]);%,'notiles');            

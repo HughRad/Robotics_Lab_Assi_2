@@ -6,15 +6,23 @@ classdef TaskDemo < handle
         UR;
         URgrip;  %grippers
         COgrip;
+        URpos; %current gripper q positions
+        COpos;
 
         % Environment
         glasspos;  %starting glass locations
         glassPLY;  %glass model info
         cupSpot;   %cup pouring destination locations (beer taps 1-4)
+        CupMod;    %Glass to end effector offset (so its grabbed correctly)
+        v;         %vector position data for glass ply at origin
 
         % Functionality
         glass; %the target glass
         beer; %the target beer
+        GlassLock; %if glass is grabbed or not
+        GP; %which glass is held
+        GR; %which robot is holding the glass
+
     end
 
     methods
@@ -24,29 +32,29 @@ classdef TaskDemo < handle
 
             C = DobotCR5(transl([-0.60,0.70,0.68])); %Load bots (with offset)
             hold on;
-            U = UR3(transl([0.30,0.66,0.68]));
+            U = UR3(transl([0.25,0.66,0.68]));
 
             self.CO = C.model; %account for .model
             self.UR = U.model;
-
+            
             self.CO.delay = 0; %remove delay + set intial pos
             self.UR.delay = 0;
             self.UR.animate([0,-pi/2,0,-pi/2,0,0]);
 
-            [f1,v1,data1] = plyread('Robotiq_3finger.ply','tri'); %gets gripper vertex info at 0,0,0
-            self.COgrip = PlaceObject('Robotiq_3finger.ply',[0,0,0]); %load gripper model
-            self.URgrip = PlaceObject('Robotiq_3finger.ply',[0,0,0]);
+            self.COgrip = Place2F85(self.CO); %load gripper model
+            self.URgrip = Place2F85(self.UR);
+
+            COend = self.CO.fkine(self.CO.getpos).T; % Calculate end-effector transformations
+            URend = self.UR.fkine(self.UR.getpos).T;
+
+            self.COpos = self.COgrip.openClawPos;
+            self.URpos = self.URgrip.openClawPos;
+
+            animateGripper(self.COgrip,self.COpos,COend); % Animate grippers to start pos
+            animateGripper(self.URgrip,self.URpos,URend);   
     
             % load in the environment
             self.createEnvironment;
-
-            gripvertfin = self.CO.fkine(self.CO.getpos).T*trotz(pi/2)*transl(0,0,-0.003);
-            transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin';
-            set(self.COgrip,'Vertices',transVertfin(:,1:3));
-
-            gripvertfin = self.UR.fkine(self.UR.getpos).T*trotz(pi/2)*transl(0,0,-0.003);
-            transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin';
-            set(self.URgrip,'Vertices',transVertfin(:,1:3));
 
             axis([-1,1,0,1.5,0.5,1.5]); %close up
             % axis([-2,2,-2,2,0,2]); %full View
@@ -55,30 +63,31 @@ classdef TaskDemo < handle
             % initialise target glass and beer
             self.glass = 1;
             self.beer = 1;
+            self.GlassLock = false; 
             disp("Select a beer from the GUI");
             input('hit enter')
 
             %test
             self.serveBeer;
 
-
        end
 
        function serveBeer(self)
            
-           GPick = self.glasspos{self.glass} + [0,-0.1,0.05]; %Grabbing location + offset to grab glass right 
-           GPlace = self.cupSpot{self.beer} + [0,0.1,0.05];   %Cup filling location + offset to grab glass right
-           GP = self.glassPLY(self.glass); %the Glass PLY we will be moving
+           GPick = self.glasspos{self.glass} + [0,-0.125,0.07]; %Grabbing location + offset to grab glass right 
+           GPlace = self.cupSpot{self.beer} + [0,0.125,0.07];   %Cup filling location + offset to grab glass right
+         
+           self.BeerServer(GPick,GPlace) %Beer serving animation
+           % self.GP = self.glassPLY(self.glass);
 
-           self.BeerServer(GPick,GPlace,GP) %Beer serving animation
+           Pickpos = self.GlassReturn();
+           
+           GPick2 = self.cupSpot{7} + [0,-0.125,0.07];
+           GPlace2 = Pickpos + [0,0.125,0.07];
 
-           Pickpos = self.GlassReturn(GP);
-           GPick2 = self.cupSpot{7} + [0,-0.1,0.05];
-           GPlace2 = Pickpos + [0,0.1,0.05];
+           self.BeerRecaller(GPick2,GPlace2)
 
-           self.BeerRecaller(GPick2,GPlace2,GP)
-
-           self.BeerReturner(GPick,GPlace,GP)
+           self.BeerReturner(GPick)
 
            self.glass = self.glass + 1; %cycle through glasses
            if self.glass == 5
@@ -87,91 +96,83 @@ classdef TaskDemo < handle
 
        end
 
-       function Ranimate(self,URqMatrix,COqMatrix,GP,cupholder) %robot animation function
+       function Ranimate(self,Robot,Gripper,qMatrix,qGrip) %robot animation Loop
+           for i = 1:1:size(qMatrix)   
+               Robot.animate(qMatrix(i,:));
 
-            [f1,v1,data1] = plyread('Robotiq_3finger.ply','tri'); %gets gripper vertex info at 0,0,0
-            [f,v,data] = plyread('Glass.ply','tri'); %gets vector position data for glass ply at origin
+               endeffect = Robot.fkine(Robot.getpos).T;
+               animateGripper(Gripper,qGrip,endeffect);
 
-            if length(URqMatrix) >= 6 && length(COqMatrix) < 6 %if ONLY the UR matrix is given, only animate the UR
-                for i = 1:1:size(URqMatrix)
-                    self.UR.animate(URqMatrix(i,:)); 
-    
-                    gripvertfin = self.UR.fkine(URqMatrix(i,:)).T*trotz(pi/2)*transl(0,0,-0.003); 
-                    transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
-                    set(self.URgrip,'Vertices',transVertfin(:,1:3)); 
+               if self.GlassLock == true
+                   grabvert = self.GR.fkine(qMatrix(i,:)).T*self.CupMod;
+                   transVert = [self.v,ones(size(self.v,1),1)]*grabvert';
+                   set(self.GP,'Vertices',transVert(:,1:3));
+               end
+               pause(0.005);
+           end     
+       end
 
-                    if exist('GP', 'var') == 1 %if beer ply info given, move beer too
-                        grabvert = self.UR.fkine(URqMatrix(i,:)).T*troty(-pi/2)*transl(0.1,0,-0.05); 
-                        transVert = [v,ones(size(v,1),1)]*grabvert'; 
-                        set(GP,'Vertices',transVert(:,1:3)); 
-                    end
+       function RanimateDual(self,URqMatrix,COqMatrix,URqGrip,COqGrip) %double robot animation loop 
+           for i = 1:1:size(URqMatrix)
+               self.UR.animate(URqMatrix(i,:));
+               self.CO.animate(COqMatrix(i,:));
 
-                    pause(0.01);
-                end
-            end
+               COend = self.CO.fkine(self.CO.getpos).T;
+               animateGripper(self.COgrip,COqGrip,COend);
 
-            if length(COqMatrix) >= 6 && length(URqMatrix) < 6  %if ONLY the CO matrix is given, only animate the CO
-                for i = 1:1:size(COqMatrix)
-                    self.CO.animate(COqMatrix(i,:)); 
-    
-                    gripvertfin = self.CO.fkine(COqMatrix(i,:)).T*trotz(pi/2)*transl(0,0,-0.003); 
-                    transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
-                    set(self.COgrip,'Vertices',transVertfin(:,1:3));
+               URend = self.UR.fkine(self.UR.getpos).T;
+               animateGripper(self.URgrip,URqGrip,URend);
 
-                    if exist('GP', 'var') == 1 %if beer ply info given, move beer too
-                        grabvert = self.CO.fkine(COqMatrix(i,:)).T*troty(-pi/2)*transl(0.1,0,-0.05); 
-                        transVert = [v,ones(size(v,1),1)]*grabvert'; 
-                        set(GP,'Vertices',transVert(:,1:3)); 
-                    end
+               if self.GlassLock == true
+                   if self.GR == self.CO
+                       grabvert = self.GR.fkine(COqMatrix(i,:)).T*self.CupMod;
+                   end
+                   if self.GR == self.UR
+                       grabvert = self.GR.fkine(URqMatrix(i,:)).T*self.CupMod;
+                   end
+                   transVert = [self.v,ones(size(self.v,1),1)]*grabvert';
+                   set(self.GP,'Vertices',transVert(:,1:3));
+               end
+               pause(0.005);
+           end
+       end
+      
+       function ReleaseGlass(self,Gripper,qGrip)
+            openClaw(Gripper) %play claw animation
+            self.GlassLock = false; %tell ranimate that the glass should not move
+            self.(qGrip) = Gripper.openClawPos; %update gipper jaw positions
+       end
 
-                    pause(0.01);
-                end
-            end
+       function GrabGlass(self,Robot,Gripper,qGrip)
+            glassClaw(Gripper) %play claw animation
+            self.GlassLock = true; %tell ranimate that the glass should move
+            self.GP = self.glassPLY(self.glass); %tell ranimate which glass to move
+            self.GR = Robot; %tell ranimate which robot should move the glass 
+            self.(qGrip) = Gripper.glassClawPos; %update gipper jaw positions
+       end
 
-            if length(URqMatrix) >= 6 && length(COqMatrix) >= 6  %if matrix are given, animate both the UR and CO
-                for i = 1:1:size(COqMatrix)
-                    self.CO.animate(COqMatrix(i,:)); 
-                    self.UR.animate(URqMatrix(i,:)); 
-    
-                    gripvertfin = self.CO.fkine(COqMatrix(i,:)).T*trotz(pi/2)*transl(0,0,-0.003); 
-                    transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
-                    set(self.COgrip,'Vertices',transVertfin(:,1:3));  
+       function GrabTap(self,Gripper,qGrip)
+            tapClaw(Gripper) %play claw animation
+            self.(qGrip) = Gripper.tapClawPos; %update gipper jaw positions
+       end
 
-                    gripvertfin = self.UR.fkine(URqMatrix(i,:)).T*trotz(pi/2)*transl(0,0,-0.003); 
-                    transVertfin = [v1,ones(size(v1,1),1)]*gripvertfin'; 
-                    set(self.URgrip,'Vertices',transVertfin(:,1:3)); 
-
-                    if exist('GP', 'var') == 1 %if beer ply info given, move beer too
-                        if cupholder == 1 %move cup with respect to UR
-                            grabvert = self.UR.fkine(URqMatrix(i,:)).T*troty(-pi/2)*transl(0.1,0,-0.05); 
-                        else %move cup with respect to CO
-                            grabvert = self.CO.fkine(COqMatrix(i,:)).T*troty(-pi/2)*transl(0.1,0,-0.05);         
-                        end
-                        transVert = [v,ones(size(v,1),1)]*grabvert'; 
-                        set(GP,'Vertices',transVert(:,1:3));
-                    end
-                    pause(0.01);
-                end    
-            end
-        end
-
-       function BeerServer(self,GPick,GPlace,GP) %UR bot cup filler/placer
+       function BeerServer(self,GPick,GPlace) %Animation Loop pt1
 
            %to start
            q0 = [-1.6336,-1.1938,1.5080,-0.3142,1.5080,0];
            tr = transl(GPick+[0,0,0.2])*troty(pi/2)*trotx(-pi/2);
            newQ = self.UR.ikcon(tr,q0);
            URqMatrix = jtraj(self.UR.getpos,newQ,50);
-           self.Ranimate(URqMatrix,[]);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
            %to cup
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [-pi/2,pi/2,0; -pi/2,pi/2,0;]';
            waypoints = [current; GPick;]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
-           self.Ranimate(URqMatrix,[]);
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,2);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
-           pause(3);
+           self.GrabGlass(self.UR,self.URgrip,'URpos')
 
            %to tap
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
@@ -179,52 +180,80 @@ classdef TaskDemo < handle
                -pi,pi/2,0; (-270*pi/180),pi/2,0;]';
            waypoints = [current; (GPick+[0,0,0.2]);0,0.9,0.9;
                -0.05,0.5,0.8; GPlace;]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
-           self.Ranimate(URqMatrix,[],GP);
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,3);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
-           pause(3);
+           self.ReleaseGlass(self.URgrip,'URpos')
+
+           %grab tap
+           current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
+           angles = [(-270*pi/180),pi/2,0;(-270*pi/180),pi/2,0;]';
+           waypoints = [current; (GPlace+[0,0,0.25]);]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,2);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
+
+           self.GrabTap(self.URgrip,'URpos')
+
+           %Tap cycle
+           current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
+           angles = [(-270*pi/180),pi/2,0;(-270*pi/180),pi/2,0;]';
+           waypoints = [current; (GPlace+[0,0.04,0.25]);(GPlace+[0,0.04,0.25]);
+               (GPlace+[0,0,0.25])]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,3);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
+
+           self.ReleaseGlass(self.URgrip,'URpos')
+
+           %To Cup
+           current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
+           angles = [(-270*pi/180),pi/2,0;(-270*pi/180),pi/2,0;]';
+           waypoints = [current; GPlace]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,2);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
+
+           self.GrabGlass(self.UR,self.URgrip,'URpos')
 
            %to end
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [(-270*pi/180),pi/2,0; (-270*pi/180),pi/2,0;
                (-310*pi/180),pi/2,0;]';
-           waypoints = [current; 0.60,0.40,0.8;
-               0.66,0.30,0.75]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
-           self.Ranimate(URqMatrix,[],GP);
+           waypoints = [current; 0.57,0.40,0.8;
+               0.66,0.30,0.77]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,3);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos); 
 
-           pause(3);
+           self.ReleaseGlass(self.URgrip,'URpos')
 
            %retract
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [(-310*pi/180),pi/2,0; (-310*pi/180),pi/2,0;
                (-2*pi),pi/2,0]';
-           waypoints = [current; 0.60,0.40,0.8;
+           waypoints = [current; 0.57,0.40,0.8;
                0.75,0.66,1]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
-           self.Ranimate(URqMatrix,[]);
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,2);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
            q0 = [0,-pi/2,0,-pi/2,0,0];
            URqMatrix = jtraj(self.UR.getpos,q0,50);
-           self.Ranimate(URqMatrix,[]);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
        end
 
-       function BeerRecaller(self,GPick,GPlace,GP)
+       function BeerRecaller(self,GPick,GPlace) %Animation Loop pt2
            %to start
            q0 = [-1.3823,-0.1257,-1.8396,-1.1310,-1.3823,0];
            tr = transl(GPlace+[0,0,0.2])*troty(pi/2)*trotx(pi/2);
            newQ = self.CO.ikcon(tr,q0);
            COqMatrix = jtraj(self.CO.getpos,newQ,50);
-           self.Ranimate([],COqMatrix);
+           self.Ranimate(self.CO,self.COgrip,COqMatrix,self.COpos);
 
            %to dirty cup
            current = tform2trvec(self.CO.fkine(self.CO.getpos).T);
            angles = [pi/2,pi/2,0; pi/2,pi/2,0;]';
            waypoints = [current; GPlace;]';
-           COqMatrix = self.RMCgen(self.CO,waypoints,angles);
-           self.Ranimate([],COqMatrix);
+           COqMatrix = self.RMCgen(self.CO,waypoints,angles,2);
+           self.Ranimate(self.CO,self.COgrip,COqMatrix,self.COpos);
 
-           pause(3);
+           self.GrabGlass(self.CO,self.COgrip,'COpos')
 
            %to washer
            current = tform2trvec(self.CO.fkine(self.CO.getpos).T);
@@ -232,77 +261,77 @@ classdef TaskDemo < handle
                3*pi/2,-pi/2,0; 3*pi/2,-pi/2,0;
                3*pi/2,-pi/2,0;3*pi/2,-pi/2,0;]';
            waypoints = [current; (GPlace+[0,0,0.2]);-0.2,0.65,0.9;
-               GPick+[0,0,0.2]; (GPick+[0,0,0.08]);
-               (GPick+[0,0,0.08]);GPick+[0,0,0.2];]';
-           COqMatrix = self.RMCgen(self.CO,waypoints,angles);
-           self.Ranimate([],COqMatrix,GP);
-
-           pause(3);
+               GPick+[0,0,0.2]; (GPick+[0,0,0.04]);
+               (GPick+[0,0,0.04]);GPick+[0,0,0.2];]';
+           COqMatrix = self.RMCgen(self.CO,waypoints,angles,3);
+           self.Ranimate(self.CO,self.COgrip,COqMatrix,self.COpos);
 
            %handover pt 1 (prepare)
            rendezvous = [-0.15,0.66,0.9];
 
            q0 = [-0.1257,-0.2513,-1.4067,-1.5080,-1.7593,1.5080];
-           tr = transl(rendezvous+[-0.2,0,0])*troty(-pi/2)*trotx(pi);
+           tr = transl(rendezvous+[-0.18,0,0])*troty(-pi/2)*trotx(pi);
            newQ = self.CO.ikcon(tr,q0);
            COqMatrix = jtraj(self.CO.getpos,newQ,50);
 
            q0 = [0,-1.3195,1.8850,-0.5655,1.5708,1.5708];
-           tr = transl(rendezvous+[0.2,0,0])*troty(-pi/2);
+           tr = transl(rendezvous+[0.18,0,0.03])*troty(-pi/2);
            newQ = self.UR.ikcon(tr,q0);
            URqMatrix = jtraj(self.UR.getpos,newQ,50);
 
-           self.Ranimate(URqMatrix,COqMatrix,GP,0);
+           self.RanimateDual(URqMatrix,COqMatrix,self.URpos,self.COpos)
 
            %handover pt 2 (join)
            current = tform2trvec(self.CO.fkine(self.CO.getpos).T);
            angles = [pi,-pi/2,0; pi,-pi/2,0;]';
-           waypoints = [current; (rendezvous+[-0.1,0,0.05]);]';
-           COqMatrix = self.RMCgen(self.CO,waypoints,angles);
+           waypoints = [current; (rendezvous+[-0.125,0,0]);]';
+           COqMatrix = self.RMCgen(self.CO,waypoints,angles,1);
 
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [0,-pi/2,0; 0,-pi/2,0;]';
-           waypoints = [current; (rendezvous+[0.1,0,0.05]);]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
+           waypoints = [current; (rendezvous+[0.125,0,0.03]);]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,1);
 
-           self.Ranimate(URqMatrix,COqMatrix,GP,0);
+           self.RanimateDual(URqMatrix,COqMatrix,self.URpos,self.COpos)
 
-           pause(3);
+           self.GrabGlass(self.UR,self.URgrip,'URpos')
+           self.ReleaseGlass(self.COgrip,'COpos')
+
+           self.CupMod = troty(-pi/2)*transl(0.125,0,-0.04);
+           self.GlassLock = true;
 
            %handover pt 3 (retract)
            current = tform2trvec(self.CO.fkine(self.CO.getpos).T);
            angles = [pi,-pi/2,0; pi,-pi/2,0;]';
-           waypoints = [current; (rendezvous+[-0.2,0,0.05]);]';
-           COqMatrix = self.RMCgen(self.CO,waypoints,angles);
+           waypoints = [current; (rendezvous+[-0.18,0,0]);]';
+           COqMatrix = self.RMCgen(self.CO,waypoints,angles,1);
 
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [0,-pi/2,0; 0,-pi/2,0;]';
-           waypoints = [current; (rendezvous+[0.2,0,0.05]);]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
+           waypoints = [current; (rendezvous+[0.18,0,0.03]);]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,1);
 
-           self.Ranimate(URqMatrix,COqMatrix,GP,1);
-
-           pause(3);
+           self.RanimateDual(URqMatrix,COqMatrix,self.URpos,self.COpos)
 
        end
 
-       function BeerReturner(self,GPick,GPlace,GP)
+       function BeerReturner(self,GPick) %Animation Loop pt3
            %return cup
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [0,-pi/2,0; 0,-pi/2,0; -pi/2,pi/2,0;-pi/2,pi/2,0;]';
-           waypoints = [current; current;(GPick+[0,0,0.2]);GPick;]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
+           waypoints = [current; current;(GPick+[0,0,0.2]);(GPick+[0,0,-0.03]);]';
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,3);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
-           self.Ranimate(URqMatrix,[],GP);
-
-           pause(3);
+           self.ReleaseGlass(self.URgrip,'URpos')
+           self.CupMod = troty(-pi/2)*transl(0.125,0,-0.07);
 
            %cup retract
            current = tform2trvec(self.UR.fkine(self.UR.getpos).T);
            angles = [-pi/2,pi/2,0; -pi/2,pi/2,0; -pi/2,pi/2,0;]';
            waypoints = [current; (GPick+[0,0,0.2]);0.3,0.9,0.9;]';
-           URqMatrix = self.RMCgen(self.UR,waypoints,angles);
-           self.Ranimate(URqMatrix,[]);
+           URqMatrix = self.RMCgen(self.UR,waypoints,angles,2);
+           self.Ranimate(self.UR,self.URgrip,URqMatrix,self.URpos);
 
            %return to start
            q0 = [0,0,0,0,0,0];
@@ -311,7 +340,7 @@ classdef TaskDemo < handle
            q0 = [0,-pi/2,0,-pi/2,0,0];
            URqMatrix = jtraj(self.UR.getpos,q0,50);
 
-           self.Ranimate(URqMatrix,COqMatrix)
+           self.RanimateDual(URqMatrix,COqMatrix,self.URpos,self.COpos)
 
        end
 
@@ -335,16 +364,32 @@ classdef TaskDemo < handle
            self.cupSpot = {[-0.02,0.26,0.7],[0.13,0.26,0.7],[0.28,0.26,0.7]...
                ,[0.43,0.26,0.7],[0.73,0.20,0.7],[-0.68,0.20,0.7]...
                ,[-0.605,1.205,0.7]};
+
+           [~,vec,~] = plyread('Glass.ply','tri'); 
+           self.v = vec;
+
+           self.CupMod = troty(-pi/2)*transl(0.125,0,-0.07);
+
        end
+
+       function Pickpos = GlassReturn(self) %moves a glass into a random location in the return bay
+           randomx = -0.5 + (-0.87 + 0.5)*rand;
+           randomy = 0.15 + (0.30 - 0.15)*rand;
+           Pickpos = [randomx,randomy,0.7];
+
+           transVert = self.v+Pickpos;
+           set(self.GP,'Vertices',transVert(:,1:3));
+       end
+
     end
 
     methods (Static)
-        function qMatrix = RMCgen(robot,waypoints,angles) %RMC path gen
+        function qMatrix = RMCgen(robot,waypoints,angles,t) %RMC path gen
             %%start/settings
-            t = 3;             % Total sim time (s)
+            % t = 3;             % Total sim time (s)
             deltaT = 0.02;      % Control frequency (time between steps)
             steps = t/deltaT;   % No. of steps for simulation
-            epsilon = 0.1;      % Threshold value for manipulability/Damped Least Squares (how close to sing before it modifyies path)
+            epsilon = 0.05;      % Threshold value for manipulability/Damped Least Squares (how close to sing before it modifyies path)
             W = diag([1 1 1 1 1 1]);    % Weighting matrix for the velocity vector (emphasis on tans or rot velocity)
 
             %Pre-Allocate array data
@@ -405,21 +450,8 @@ classdef TaskDemo < handle
                         qdot(i,j) = 0; % Stop the motor
                     end
                 end
-
                 qMatrix(i+1,:) = qMatrix(i,:) + deltaT*qdot(i,:);     % Update next joint state based on joint velocities
             end
         end
-
-        function Pickpos = GlassReturn(GP) %moves a glass into a random location in the return bay
-            [f,v,data] = plyread('Glass.ply','tri');
-
-            randomx = -0.5 + (-0.87 + 0.5)*rand;
-            randomy = 0.15 + (0.30 - 0.15)*rand;
-            Pickpos = [randomx,randomy,0.7];
-
-            transVert = v+Pickpos;
-            set(GP,'Vertices',transVert(:,1:3));
-        end
-
     end
 end
