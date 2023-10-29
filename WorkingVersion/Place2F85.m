@@ -1,4 +1,4 @@
-classdef Place2F85
+classdef Place2F85 < handle
     properties
         robot;
         fingers;

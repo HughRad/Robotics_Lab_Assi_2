@@ -39,8 +39,8 @@ classdef TaskDemo < handle
             hold on;
             self.U = UR3(transl([0.25,0.66,0.68]));
 
-            self.CO = self.C.model; %account for .model
-            self.UR = self.U.model;
+            self.CO = C.model; %account for .model
+            self.UR = U.model;
             
             self.CO.delay = 0; %remove delay + set intial pos
             self.UR.delay = 0;
