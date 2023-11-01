@@ -155,6 +155,8 @@ classdef a3 < handle
                    transVert = [self.v,ones(size(self.v,1),1)]*grabvert';
                    set(self.GP,'Vertices',transVert(:,1:3));
                end
+
+               self.pendant.updateJointSliders;
                pause(0.005);
            end     
        end
@@ -190,6 +192,8 @@ classdef a3 < handle
                    transVert = [self.v,ones(size(self.v,1),1)]*grabvert';
                    set(self.GP,'Vertices',transVert(:,1:3));
                end
+
+               self.pendant.updateJointSliders;
                pause(0.005);
            end
        end
