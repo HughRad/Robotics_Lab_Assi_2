@@ -170,8 +170,9 @@ classdef a3 < handle
            for i = 1:1:size(URqMatrix)
                 
                % check the status of the estop
+               pause(0.1);
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
-               pause(0.05);
+               
 
                self.UR.animate(URqMatrix(i,:));
                self.CO.animate(COqMatrix(i,:));
