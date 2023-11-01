@@ -86,8 +86,6 @@ classdef a3 < handle
 
        function oneStep(self,robot,Tstep)
 
-           disp('onestep running');
-
            % get the current position of the robot
            T1 = robot.fkine(robot.getpos).T;
 
@@ -143,7 +141,8 @@ classdef a3 < handle
            for i = 1:1:size(qMatrix)
                 
                % check the status of the estop
-               self.pendant.actionEStopStatus;
+               self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+               pause(0.05);
 
                Robot.animate(qMatrix(i,:));
 
@@ -157,7 +156,7 @@ classdef a3 < handle
                end
 
                self.pendant.updateJointSliders;
-               pause(0.005);
+               
            end     
        end
 
@@ -171,7 +170,8 @@ classdef a3 < handle
            for i = 1:1:size(URqMatrix)
                 
                % check the status of the estop
-               self.pendant.actionEStopStatus;
+               self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+               pause(0.05);
 
                self.UR.animate(URqMatrix(i,:));
                self.CO.animate(COqMatrix(i,:));
@@ -194,7 +194,7 @@ classdef a3 < handle
                end
 
                self.pendant.updateJointSliders;
-               pause(0.005);
+               
            end
        end
       
