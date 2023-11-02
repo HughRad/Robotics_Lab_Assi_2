@@ -41,9 +41,9 @@ classdef Place2F85 < handle
 
             % Load the 'GripperBase.ply' file and vertices
             [place.clawbase, place.gripperBaseVertices] = place.loadGripperBase();
-                        % Hide specific axes (e.g., x, y, and z)
             
-            % Teach initial joint positions for each Finger
+            
+            % Sets finger bases to the precomputed transforms
             for i = 1:numel(place.fingers)
                 place.fingers{i}.model.base = place.fingerBaseTransforms{i};
             end
@@ -59,6 +59,7 @@ classdef Place2F85 < handle
             place.updateGripperBaseVertices(newToolB);
         end
 
+        %calculates the base of the fingers from the robot end effector (newToolB)
         function base = calculateFingerBase(place, fingerIndex, newToolB)
              if nargin < 3
                 toolB = place.robot.model.fkine(place.robot.model.getpos).T;
@@ -74,11 +75,13 @@ classdef Place2F85 < handle
             base = baseTransforms{fingerIndex};
         end
 
+        %loads in clawbase ply model
         function [clawbase, vertices] = loadGripperBase(place)
             clawbase = PlaceObject('R2F85Base.ply', [0, 0, 0]);
             [~, vertices, ~] = plyread('R2F85Base.ply', 'tri');
         end
 
+        %updates clawbase ply model vertices based on robot end effector (newToolB)
         function updateGripperBaseVertices(place, newToolB)
             clawBase = newToolB * trotz(deg2rad(-180))*trotx(deg2rad(90))*troty(deg2rad(90));
             baseVert = [place.gripperBaseVertices, ones(size(place.gripperBaseVertices, 1), 1)] * clawBase';
