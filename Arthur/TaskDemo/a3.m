@@ -153,9 +153,22 @@ classdef a3 < handle
                if self.pendant.TogglehandButton.Value == true
 
                    self.pendant.animateHand;
+
+                   % check if the hand is inside the light curtain
+                   % pause the animation until the hand is removed
+
+                   while self.pendant.checkLightCurtain
+                       self.pendant.animateHand;
+                       self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+                       pause(0.001);
+                   end
+
                end
+               
 
                
+
+
 
 
 

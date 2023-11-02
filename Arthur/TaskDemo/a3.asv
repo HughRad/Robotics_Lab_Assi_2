@@ -149,7 +149,27 @@ classdef a3 < handle
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
                pause(0.05);
 
-               % check light curtain
+               % animate object movement if it exists
+               if self.pendant.TogglehandButton.Value == true
+
+                   self.pendant.animateHand;
+
+                   % check if the hand is inside the light curtain
+                   % pause 
+
+                   while self.pendant.checkLightCurtain
+                       self.pendant.animateHand;
+                       self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+                   end
+
+               end
+               
+
+               
+
+
+
+
 
                Robot.animate(qMatrix(i,:));
 
