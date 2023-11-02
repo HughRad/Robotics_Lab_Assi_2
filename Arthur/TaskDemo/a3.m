@@ -21,13 +21,18 @@ classdef a3 < handle
         cupSpot;   %cup pouring destination locations (beer taps 1-4)
         CupMod;    %Glass to end effector offset (so its grabbed correctly)
         v;         %vector position data for glass ply at origin
-
-        % Functionality
+        
+        % Glass/beer Functionality
         glass; %the target glass
         beer; %the target beer
         GlassLock; %if glass is grabbed or not
         GP; %which glass is held
         GR; %which robot is holding the glass
+
+        %Collision Functionality
+        trapvert;   %vertex data to be considered in collision detection
+        EllipData; %Ellipsoid class to detect collisions
+        CollCheck; %true/fase for if a collision happens
 
         % App
         pendant;
@@ -60,10 +65,10 @@ classdef a3 < handle
             COend = self.CO.fkine(self.CO.getpos).T; % Calculate end-effector transformations
             URend = self.UR.fkine(self.UR.getpos).T;
 
-            self.COpos = self.COgrip.openClawPos;
+            self.COpos = self.COgrip.openClawPos; %sets current claw positions to open
             self.URpos = self.URgrip.openClawPos;
 
-            animateGripper(self.COgrip,self.COpos,COend); % Animate grippers to start pos
+            animateGripper(self.COgrip,self.COpos,COend); % move grippers to start pos
             animateGripper(self.URgrip,self.URpos,URend);   
 
             % load in the environment
@@ -73,15 +78,13 @@ classdef a3 < handle
             % axis([-2,2,-2,2,0,2]); %full View
             view(3);
 
+            self.CollCheck = false; %set to assume no collisions
+
             % initialise target glass and beer
             self.glass = 1;
             self.beer = 1;
             self.GlassLock = false; 
             disp("Select a beer from the GUI");
-
-            %test
-            % self.serveBeer;
-
        end
 
        function oneStep(self,robot,Tstep)
@@ -118,8 +121,10 @@ classdef a3 < handle
            GPick = self.glasspos{self.glass} + [0,-0.125,0.07]; %Grabbing location + offset to grab glass right 
            GPlace = self.cupSpot{self.beer} + [0,0.125,0.07];   %Cup filling location + offset to grab glass right
          
+           % self.CollisionDemo %for testing
+
            self.BeerServer(GPick,GPlace) %Beer serving animation
-           % self.GP = self.glassPLY(self.glass);
+           % self.GP = self.glassPLY(self.glass); for testing
 
            Pickpos = self.GlassReturn();
            
@@ -149,6 +154,20 @@ classdef a3 < handle
                endeffect = Robot.fkine(Robot.getpos).T;
                animateGripper(Gripper,qGrip,endeffect);
 
+               if Robot == self.UR %check for collisions with UR
+                   self.CollCheck = self.EllipData.URmesh(qMatrix(i,:));
+               end
+
+               if Robot == self.CO %check for collisions with CO
+                   self.CollCheck = self.EllipData.CR5mesh(qMatrix(i,:));
+               end
+
+               if self.CollCheck == true
+                   disp('Engaging e-stop')
+                   %auto activate Estop
+                   self.CollCheck = false;
+               end
+
                if self.GlassLock == true
                    grabvert = self.GR.fkine(qMatrix(i,:)).T*self.CupMod;
                    transVert = [self.v,ones(size(self.v,1),1)]*grabvert';
@@ -173,7 +192,6 @@ classdef a3 < handle
                pause(0.1);
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
                
-
                self.UR.animate(URqMatrix(i,:));
                self.CO.animate(COqMatrix(i,:));
 
@@ -182,6 +200,22 @@ classdef a3 < handle
 
                URend = self.UR.fkine(self.UR.getpos).T;
                animateGripper(self.URgrip,URqGrip,URend);
+
+               self.CollCheck = self.EllipData.URmesh(URqMatrix(i,:)); %check for collisions with both bots
+
+               if self.CollCheck == true
+                   disp('Engaging e-stop')
+                   %auto activate Estop
+                   self.CollCheck = false;
+               end
+
+               self.CollCheck = self.EllipData.CR5mesh(COqMatrix(i,:));
+
+               if self.CollCheck == true
+                   disp('Engaging e-stop')
+                   %auto activate Estop
+                   self.CollCheck = false;
+               end
 
                if self.GlassLock == true
                    if self.GR == self.CO
@@ -408,8 +442,8 @@ classdef a3 < handle
 
        function self = createEnvironment(self)
 
-           PlaceObject('BarBase.ply',[0,0,0]); %load bar models
-           PlaceObject('BarSafe.ply',[0,0,0]);
+           O1 = PlaceObject('BarBase.ply',[0,0,0]); %load bar models
+           O2 = PlaceObject('BarSafe.ply',[0,0,0]);
            PlaceObject('BeerTap.ply',[-0.05,0,0]);
            PlaceObject('BeerTap.ply',[0.10,0,0]);
            PlaceObject('BeerTap.ply',[0.25,0,0]);
@@ -432,6 +466,12 @@ classdef a3 < handle
 
            self.CupMod = troty(-pi/2)*transl(0.125,0,-0.07);
 
+           %which model vertices are to be considered in collision checks
+           self.trapvert = vertcat(get(O1,'Vertices'),get(O2,'Vertices'));
+
+           %Creating the collision class object
+           self.EllipData = Ellipsoid(self.UR,self.CO,self.trapvert);
+
        end
 
        function Pickpos = GlassReturn(self) %moves a glass into a random location in the return bay
@@ -441,6 +481,12 @@ classdef a3 < handle
 
            transVert = self.v+Pickpos;
            set(self.GP,'Vertices',transVert(:,1:3));
+       end
+
+       function CollisionDemo(self) %loads a barrier ply and adds it into collision consideration
+           hue = PlaceObject('Human.ply',[-0.1,0.5,0.5]);
+           self.trapvert = vertcat(self.trapvert,get(hue,'Vertices'));
+           self.EllipData = Ellipsoid(self.UR,self.CO,self.trapvert);
        end
 
     end
