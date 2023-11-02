@@ -149,15 +149,7 @@ classdef a3 < handle
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
                pause(0.05);
 
-               % animate object movement if it exists
-               if self.pendant.TogglehandButton.Value == true
-
-                   self.pendant.animateHand;
-               end
-
-               
-
-
+               % check light curtain
 
                Robot.animate(qMatrix(i,:));
 
