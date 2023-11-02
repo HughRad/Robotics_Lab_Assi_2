@@ -21,6 +21,9 @@ classdef a3 < handle
         cupSpot;   %cup pouring destination locations (beer taps 1-4)
         CupMod;    %Glass to end effector offset (so its grabbed correctly)
         v;         %vector position data for glass ply at origin
+
+        % Obstacle
+        hue; %human model for collision test
         
         % Glass/beer Functionality
         glass; %the target glass
@@ -85,6 +88,18 @@ classdef a3 < handle
             self.beer = 1;
             self.GlassLock = false; 
             disp("Select a beer from the GUI");
+       end
+
+       function CollisionDemo(self) %loads a barrier ply and adds it into collision consideration
+           self.hue = PlaceObject('Human.ply',[-0.1,0.5,0.5]);
+           self.trapvert = vertcat(self.trapvert,get(self.hue,'Vertices'));
+           self.EllipData = Ellipsoid(self.UR,self.CO,self.trapvert);
+       end
+
+       function CollisionDemoEnd(self) %loads a barrier ply and adds it into collision consideration
+           self.trapvert = self.trapvert(1:size(get(self.hue,'Vertices'),1),:);
+           delete(self.hue);
+           self.EllipData = Ellipsoid(self.UR,self.CO,self.trapvert);
        end
 
        function oneStep(self,robot,Tstep)
@@ -164,13 +179,6 @@ classdef a3 < handle
                    end
 
                end
-               
-
-               
-
-
-
-
 
                Robot.animate(qMatrix(i,:));
 
@@ -186,8 +194,7 @@ classdef a3 < handle
                end
 
                if self.CollCheck == true
-                   disp('Engaging e-stop')
-                   %auto activate Estop
+                   self.pendant.actionCollisionDetection([self.UR.getpos; self.CO.getpos]);
                    self.CollCheck = false;
                end
 
@@ -214,6 +221,22 @@ classdef a3 < handle
                % check the status of the estop
                pause(0.1);
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+
+               % animate object movement if it exists
+               if self.pendant.TogglehandButton.Value == true
+
+                   self.pendant.animateHand;
+
+                   % check if the hand is inside the light curtain
+                   % pause the animation until the hand is removed
+
+                   while self.pendant.checkLightCurtain
+                       self.pendant.animateHand;
+                       self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+                       pause(0.001);
+                   end
+
+               end
                
                self.UR.animate(URqMatrix(i,:));
                self.CO.animate(COqMatrix(i,:));
@@ -504,12 +527,6 @@ classdef a3 < handle
 
            transVert = self.v+Pickpos;
            set(self.GP,'Vertices',transVert(:,1:3));
-       end
-
-       function CollisionDemo(self) %loads a barrier ply and adds it into collision consideration
-           hue = PlaceObject('Human.ply',[-0.1,0.5,0.5]);
-           self.trapvert = vertcat(self.trapvert,get(hue,'Vertices'));
-           self.EllipData = Ellipsoid(self.UR,self.CO,self.trapvert);
        end
 
     end
