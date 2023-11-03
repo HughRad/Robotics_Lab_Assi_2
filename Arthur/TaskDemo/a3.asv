@@ -36,6 +36,7 @@ classdef a3 < handle
         trapvert;   %vertex data to be considered in collision detection
         EllipData; %Ellipsoid class to detect collisions
         CollCheck; %true/fase for if a collision happens
+        checkCollisions;
 
         % App
         pendant;
