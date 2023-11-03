@@ -77,9 +77,9 @@ classdef a3 < handle
             % load in the environment
             self.createEnvironment;
 
-            % axis([-1,1,0,1.5,0.5,1.5]); %close up
-            % % axis([-2,2,-2,2,0,2]); %full View
-            % view(3);
+            axis([-1,1,0,1.5,0.5,1.5]); %close up
+            % axis([-2,2,-2,2,0,2]); %full View
+            view(3);
 
             self.CollCheck = false; %set to assume no collisions
 
