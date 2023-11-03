@@ -161,8 +161,9 @@ classdef a3 < handle
            for i = 1:1:size(qMatrix)
                 
                % check the status of the estop
-               self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
                pause(0.05);
+               self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
+               
 
                % animate object movement if it exists
                if self.pendant.TogglehandButton.Value == true
@@ -185,11 +186,11 @@ classdef a3 < handle
                endeffect = Robot.fkine(Robot.getpos).T;
                animateGripper(Gripper,qGrip,endeffect);
 
-               if Robot == self.UR %check for collisions with UR
+               if Robot == self.UR && self.pendant.getColButStatus %check for collisions with UR
                    self.CollCheck = self.EllipData.URmesh(qMatrix(i,:));
                end
 
-               if Robot == self.CO %check for collisions with CO
+               if Robot == self.CO && self.pendant.getColButStatus %check for collisions with CO
                    self.CollCheck = self.EllipData.CR5mesh(qMatrix(i,:));
                end
 
@@ -219,7 +220,7 @@ classdef a3 < handle
            for i = 1:1:size(URqMatrix)
                 
                % check the status of the estop
-               pause(0.1);
+               pause(0.05);
                self.pendant.actionEStopStatus([self.UR.getpos; self.CO.getpos]);
 
                % animate object movement if it exists
@@ -247,7 +248,9 @@ classdef a3 < handle
                URend = self.UR.fkine(self.UR.getpos).T;
                animateGripper(self.URgrip,URqGrip,URend);
 
-               self.CollCheck = self.EllipData.URmesh(URqMatrix(i,:)); %check for collisions with both bots
+               if self.pendant.getColButStatus
+                   self.CollCheck = self.EllipData.URmesh(URqMatrix(i,:)); %check for collisions with both bots
+               end
 
                if self.CollCheck == true
                    disp('Engaging e-stop')
@@ -255,7 +258,9 @@ classdef a3 < handle
                    self.CollCheck = false;
                end
 
-               self.CollCheck = self.EllipData.CR5mesh(COqMatrix(i,:));
+               if self.pendant.getColButStatus
+                   self.CollCheck = self.EllipData.CR5mesh(COqMatrix(i,:)); %check for collisions with both bots
+               end
 
                if self.CollCheck == true
                    disp('Engaging e-stop')
