@@ -8,7 +8,7 @@ classdef Place2F85
         openClawPos;
         tapClawPos;
         glassClawPos;
-        fingerBase;  % Precomputed fingerBase transformation (
+        fingerBase;  % Precomputed fingerBase transformation 
         fingerBaseTransforms;  % Precomputef base transformations for each finger
         gripperBaseVertices;  % Precomputed gripperBase vertices
     end
