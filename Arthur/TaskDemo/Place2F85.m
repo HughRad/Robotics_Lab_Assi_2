@@ -8,9 +8,9 @@ classdef Place2F85
         openClawPos;
         tapClawPos;
         glassClawPos;
-        fingerBase;  % Precompute fingerBase transformation
-        fingerBaseTransforms;  % Precompute base transformations for each finger
-        gripperBaseVertices;  % Precompute gripperBase vertices
+        fingerBase;  % Precomputed fingerBase transformation (
+        fingerBaseTransforms;  % Precomputef base transformations for each finger
+        gripperBaseVertices;  % Precomputed gripperBase vertices
     end
 
     methods
@@ -41,9 +41,9 @@ classdef Place2F85
 
             % Load the 'GripperBase.ply' file and vertices
             [place.clawbase, place.gripperBaseVertices] = place.loadGripperBase();
-                        % Hide specific axes (e.g., x, y, and z)
             
-            % Teach initial joint positions for each Finger
+            
+            % sets base of each finger from pre computed transforms
             for i = 1:numel(place.fingers)
                 place.fingers{i}.model.base = place.fingerBaseTransforms{i};
             end
@@ -59,6 +59,8 @@ classdef Place2F85
             place.updateGripperBaseVertices(newToolB);
         end
 
+        % determines new base transformation for each finger based on the new toolbase 
+        %(Robots end effector transform)
         function base = calculateFingerBase(place, fingerIndex, newToolB)
              if nargin < 3
                 toolB = place.robot.model.fkine(place.robot.model.getpos).T;
@@ -74,11 +76,14 @@ classdef Place2F85
             base = baseTransforms{fingerIndex};
         end
 
+        %loads in base of gripper and stores vertices
         function [clawbase, vertices] = loadGripperBase(place)
             clawbase = PlaceObject('R2F85Base.ply', [0, 0, 0]);
             [~, vertices, ~] = plyread('R2F85Base.ply', 'tri');
         end
 
+        %Updates base of gripper from the placed position to the inital tool base 
+        %transform base vertices by the robot end effector transform
         function updateGripperBaseVertices(place, newToolB)
             clawBase = newToolB * trotz(deg2rad(-180))*trotx(deg2rad(90))*troty(deg2rad(90));
             baseVert = [place.gripperBaseVertices, ones(size(place.gripperBaseVertices, 1), 1)] * clawBase';
